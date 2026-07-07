@@ -1,0 +1,43 @@
+import { ActionEvent } from '@lumana/contracts';
+import { LogsRepository } from '../logs/logs.repository';
+import { EventsService } from './events.service';
+
+describe('EventsService', () => {
+  it('maps an ActionEvent to an EventLog with a new id and preserved timestamp, then inserts', async () => {
+    const insert = jest.fn().mockResolvedValue(undefined);
+    const svc = new EventsService({ insert } as unknown as LogsRepository);
+
+    const event: ActionEvent = {
+      sourceAction: 'search',
+      type: 'search',
+      payload: { results: 3, total: 10 },
+      timestamp: '2026-07-03T10:00:00.000Z',
+    };
+    await svc.record(event);
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    const log = insert.mock.calls[0][0];
+    expect(log).toMatchObject({
+      sourceAction: 'search',
+      type: 'search',
+      payload: { results: 3, total: 10 },
+      timestamp: '2026-07-03T10:00:00.000Z',
+    });
+    expect(typeof log.id).toBe('string');
+    expect(log.id.length).toBeGreaterThan(0);
+  });
+
+  it('generates a distinct id per event', async () => {
+    const insert = jest.fn().mockResolvedValue(undefined);
+    const svc = new EventsService({ insert } as unknown as LogsRepository);
+    const base: ActionEvent = {
+      sourceAction: 'ingest',
+      type: 'ingest',
+      payload: {},
+      timestamp: '2026-07-03T10:00:00.000Z',
+    };
+    await svc.record(base);
+    await svc.record(base);
+    expect(insert.mock.calls[0][0].id).not.toBe(insert.mock.calls[1][0].id);
+  });
+});

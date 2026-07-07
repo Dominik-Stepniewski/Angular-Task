@@ -1,0 +1,198 @@
+@use '@angular/material' as mat;
+
+// --- design tokens (operations-console dark, Mk II) -------------------------
+:root {
+  /* surface ladder */
+  --bg: #0a0d0e;
+  --surface: #14181a;
+  --surface-2: #1b2225;
+  --raised: #1b2225; /* alias kept for existing refs */
+
+  /* borders — demoted; shadow carries separation now */
+  --line: rgba(255, 255, 255, 0.07);
+  --hairline: #2a3236; /* dividers + canvas grid only */
+
+  /* ink */
+  --ink: #e6edef;
+  --text: #e6edef; /* alias */
+  --muted: #7c8a90;
+
+  /* accents */
+  --amber: #ffc24b;
+  --accent: #ffc24b; /* interactive */
+  --cyan: #4bd6e0;
+  --select: #4bd6e0; /* semantic only */
+  --danger: #ff5c5c;
+
+  /* elevation */
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 8px 24px -4px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --ring: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --focus: 0 0 0 2px rgba(255, 194, 75, 0.55);
+
+  /* radius — sharp */
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 6px;
+
+  /* space */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 140ms;
+  --dur: 180ms;
+  --dur-slow: 220ms;
+
+  --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+// Angular Material dark theme (amber primary / cyan tertiary).
+html {
+  color-scheme: dark;
+  @include mat.theme(
+    (
+      color: (
+        theme-type: dark,
+        primary: mat.$orange-palette,
+        tertiary: mat.$cyan-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 600px at 70% -10%, #10161890 0%, transparent 60%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+// subtle grid backdrop
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  background:
+    repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 32px),
+    repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 32px);
+}
+
+.annotation-dialog-panel .mat-mdc-dialog-surface {
+  background: var(--surface);
+  padding: var(--s5);
+  // Let the (resizable) editor drive the size: lift MDC's ~560px surface cap and
+  // let width/height follow the content instead of the fixed dialog config.
+  max-width: none;
+  width: auto;
+  height: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--elev-2), var(--ring);
+}
+
+.annotation-dialog-panel .mat-mdc-dialog-container {
+  max-height: 96vh;
+  max-width: 96vw;
+  overflow: hidden;
+}
+
+// Phone widths: trim the surface padding so the full-width editor + toolbar fit.
+@media (max-width: 640px) {
+  .annotation-dialog-panel .mat-mdc-dialog-surface {
+    padding: var(--s3);
+  }
+}
+
+// --- button hierarchy (global; component styles are encapsulated) -----------
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font: 600 13px var(--font-sans);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--bg);
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.btn--secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--line);
+
+  &:hover:not(:disabled) {
+    border-color: var(--muted);
+  }
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--muted);
+
+  &:hover:not(:disabled) {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.btn--danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+
+  &:hover:not(:disabled) {
+    background: var(--danger);
+    color: var(--bg);
+  }
+}
+
+.btn--on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255, 194, 75, 0.1);
+}

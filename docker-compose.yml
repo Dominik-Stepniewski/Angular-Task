@@ -1,0 +1,93 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis/redis-stack:7.4.0-v3
+    ports:
+      - '6379:6379'
+      - '8001:8001'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2
+    ports:
+      - '4222:4222'
+
+  service-a:
+    build:
+      context: .
+      dockerfile: apps/service-a/Dockerfile
+    ports:
+      - '3001:3000'
+    volumes:
+      - ./apps/service-a/data:/app/data
+    environment:
+      PORT: '3000'
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: lumana
+      REDIS_URL: redis://redis:6379
+      NATS_URL: nats://nats:4222
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://localhost:3000/docs',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+
+  service-b:
+    build:
+      context: .
+      dockerfile: apps/service-b/Dockerfile
+    ports:
+      - '3002:3000'
+    environment:
+      PORT: '3000'
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: logs
+      REDIS_URL: redis://redis:6379
+      NATS_URL: nats://nats:4222
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://localhost:3000/docs',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+
+volumes:
+  mongo-data: {}

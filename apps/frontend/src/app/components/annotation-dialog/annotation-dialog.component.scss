@@ -1,0 +1,189 @@
+.annotation-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  color: var(--ink, #e6edef);
+  box-sizing: border-box;
+  // Definite size so the flex:1 `.stage` gets real space (a `max-height` alone
+  // leaves the column content-sized and collapses the stage to 0). Sized wide
+  // enough that the toolbar fits on one row, and user-resizable via `resize`.
+  width: min(1040px, 88vw);
+  height: min(760px, 82vh);
+  min-width: 460px;
+  min-height: 420px;
+  max-width: 92vw;
+  max-height: 88vh;
+  resize: both; // draggable bottom-right grip resizes the whole editor
+  overflow: hidden;
+
+  // Phone widths: min-width:460px would overflow a ~360px viewport and push the
+  // toolbar (Save/Delete/Clear) off-screen with no page scroll to reach it. Fill
+  // the viewport instead and let the toolbar wrap.
+  @media (max-width: 640px) {
+    width: 100%;
+    height: 82vh;
+    min-width: 0;
+    min-height: 0;
+    max-width: 100%;
+    resize: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .bar {
+    // toolbar already wraps; give the wrapped rows breathing room
+    row-gap: 0.4rem;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font: 600 1.1rem var(--font-sans, system-ui);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  // compact toolbar variant of the global .btn hierarchy
+  .btn {
+    padding: 5px 10px;
+    font: 600 12px var(--font-sans);
+  }
+
+  .close {
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+}
+
+.label-field {
+  position: relative; // anchor for the absolute suggestions dropdown
+
+  input {
+    border: 1px solid var(--line, #223034);
+    background: var(--surface, #14181a);
+    color: var(--ink, #e6edef);
+    border-radius: 6px;
+    padding: 0.32rem 0.6rem;
+    font: 500 0.82rem var(--font-mono, monospace);
+    width: 10rem;
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--amber, #ffc24b);
+    }
+  }
+}
+
+.label-suggestions {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  min-width: 10rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  background: var(--surface, #14181a);
+  border: 1px solid var(--line, #223034);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  li {
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font: 500 0.82rem var(--font-mono, monospace);
+
+    &:hover {
+      background: rgba(255, 194, 75, 0.12);
+    }
+  }
+}
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  border: 1px solid var(--line, #223034);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0c0f10;
+}
+
+.cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1;
+
+  &.placeholder {
+    background:
+      repeating-linear-gradient(0deg, #10161899 0 1px, transparent 1px 24px),
+      repeating-linear-gradient(90deg, #10161899 0 1px, transparent 1px 24px);
+  }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  touch-action: none;
+
+  &.drawing {
+    cursor: crosshair;
+  }
+}
+
+.hud {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font: 500 0.78rem var(--font-mono, monospace);
+  color: var(--muted, #7c8a90);
+
+  .hint,
+  .spacer {
+    margin-left: auto;
+  }
+
+  .dirty {
+    color: var(--accent);
+  }
+
+  .btn {
+    padding: 6px 14px;
+    font: 600 12.5px var(--font-sans);
+  }
+}

@@ -1,0 +1,29 @@
+# Worktrees
+.worktrees/
+
+# Dependencies
+node_modules/
+
+# Nx
+.nx/cache
+.nx/workspace-data
+tmp/
+dist/
+out-tsc/
+
+# Env
+.env
+.env.local
+.env.example
+
+# Data artifacts
+data/dataset.json
+
+# OS / editor
+.DS_Store
+*.log
+
+.angular
+
+# service-a ingest dataset artifact (host-mounted); keep the dir, ignore contents
+apps/service-a/data/*.json

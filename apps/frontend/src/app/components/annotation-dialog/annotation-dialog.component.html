@@ -1,0 +1,81 @@
+<div class="annotation-dialog">
+  <header class="bar">
+    <h2 class="title">{{ data.asset.title }}</h2>
+    <div class="tools" role="toolbar" aria-label="Annotation tools">
+      <div class="label-field">
+        <input
+          #labelInput
+          type="text"
+          role="combobox"
+          autocomplete="off"
+          aria-autocomplete="list"
+          aria-controls="label-suggestions-list"
+          [attr.aria-expanded]="showLabelSuggestions()"
+          (input)="onLabelInput($event)"
+          (focus)="onLabelFocus()"
+          (blur)="onLabelBlur()"
+          (change)="applyLabelToSelected()"
+          placeholder="label…"
+          aria-label="Region label"
+        />
+        @if (showLabelSuggestions()) {
+          <ul id="label-suggestions-list" class="label-suggestions" role="listbox" aria-label="Label suggestions">
+            @for (t of labelSuggestions(); track t) {
+              <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- combobox pattern: options are deliberately non-focusable; the input keeps focus and mousedown preventDefault keeps it so the click's pick fires before blur collapses the list. -->
+              <li role="option" [attr.aria-selected]="false" (mousedown)="$event.preventDefault()" (click)="pickLabel(t)">
+                {{ t }}
+              </li>
+            }
+          </ul>
+        }
+      </div>
+      <button type="button" class="btn btn--secondary" [class.btn--on]="mode() === 'draw'" [attr.aria-pressed]="mode() === 'draw'" (click)="setMode('draw')">Draw</button>
+      <button type="button" class="btn btn--secondary" [class.btn--on]="mode() === 'rect'" [attr.aria-pressed]="mode() === 'rect'" (click)="setMode('rect')">Rect</button>
+      <button type="button" class="btn btn--secondary" [class.btn--on]="mode() === 'edit'" [attr.aria-pressed]="mode() === 'edit'" (click)="setMode('edit')">Edit</button>
+      <button type="button" class="btn btn--secondary" (click)="newShape()">New</button>
+      <button type="button" class="btn btn--danger" (click)="deleteSelected()" [disabled]="!selectedGroupId()">
+        Delete
+      </button>
+      <button type="button" class="btn btn--danger" (click)="clearAll()">Clear</button>
+      <button type="button" class="btn btn--ghost close" (click)="requestClose()" aria-label="Close">✕</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    @if (!imageFailed()) {
+      <img
+        class="cover"
+        [src]="imageUrl"
+        [alt]="data.asset.title"
+        crossorigin="anonymous"
+        (load)="onImageLoad($event)"
+        (error)="imageFailed.set(true)"
+      />
+    } @else {
+      <div class="cover placeholder" aria-hidden="true"></div>
+    }
+    <canvas
+      #canvas
+      class="overlay"
+      tabindex="0"
+      [class.drawing]="mode() !== 'edit'"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp()"
+      (pointerleave)="onPointerUp()"
+      (dblclick)="closeDraft()"
+    ></canvas>
+  </div>
+
+  <footer class="hud">
+    <span>mode: {{ mode() }}</span>
+    <span>label: {{ label() || '—' }}</span>
+    <span>shapes: {{ workingPolys().length }}</span>
+    @if (dirty()) {
+      <span class="dirty">● unsaved</span>
+    }
+    <span class="spacer"></span>
+    <button type="button" class="btn btn--ghost" (click)="discard()" [disabled]="!dirty()">Discard</button>
+    <button type="button" class="btn btn--primary" (click)="save()" [disabled]="!dirty()">Save</button>
+  </footer>
+</div>

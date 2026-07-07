@@ -1,0 +1,25 @@
+<main class="console">
+  <header class="masthead">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+             stroke="var(--accent)" stroke-width="1.5" stroke-linecap="square">
+          <path class="bracket" d="M3 8V3h5" />
+          <path class="bracket" d="M21 8V3h-5" />
+          <path class="bracket" d="M3 16v5h5" />
+          <path class="bracket" d="M21 16v5h-5" />
+          <circle cx="12" cy="12" r="1.4" fill="var(--accent)" stroke="none" />
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1 class="wordmark">Tracer</h1>
+        <p class="tagline">Find an image and outline what matters.</p>
+      </div>
+    </div>
+    <nav class="topnav" aria-label="Primary">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Workbench</a>
+      <a routerLink="/ops" routerLinkActive="active">Ops</a>
+    </nav>
+  </header>
+  <router-outlet />
+</main>
