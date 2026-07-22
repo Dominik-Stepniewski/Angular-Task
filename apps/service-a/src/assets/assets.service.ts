@@ -6,12 +6,18 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Asset, Paginated } from '@lumana/contracts';
-import { AnyBulkWriteOperation } from 'mongodb';
+import { AnyBulkWriteOperation, Filter, Sort } from 'mongodb';
 import { AssetsRepository } from './assets.repository';
 import { SearchAssetsDto } from './dto/search-assets.dto';
 import { UploadResultDto } from './dto/upload-result.dto';
 import { validateAsset } from './validate-asset';
 import { isSafeHttpUrl } from './url-safety';
+import {
+  AssetDoc,
+  escapeRegex,
+  searchTokens,
+  trailingToken,
+} from './search-tokens';
 
 const IMAGE_TIMEOUT_MS = 15000;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -75,8 +81,12 @@ export class AssetsService implements OnModuleInit {
 
   async upsertAssets(assets: Asset[]): Promise<number> {
     if (assets.length === 0) return 0;
-    const ops: AnyBulkWriteOperation<Asset>[] = assets.map((a) => ({
-      updateOne: { filter: { id: a.id }, update: { $set: a }, upsert: true },
+    const ops: AnyBulkWriteOperation<AssetDoc>[] = assets.map((a) => ({
+      updateOne: {
+        filter: { id: a.id },
+        update: { $set: { ...a, searchTokens: searchTokens(a) } },
+        upsert: true,
+      },
     }));
     const res = await this.repo.bulkWrite(ops);
     return res.upsertedCount + res.modifiedCount;
@@ -89,7 +99,9 @@ export class AssetsService implements OnModuleInit {
 
     let res: Response;
     try {
-      res = await fetch(asset.url, { signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
+      res = await fetch(asset.url, {
+        signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+      });
     } catch {
       throw new BadGatewayException('UPSTREAM_TIMEOUT');
     }
@@ -100,19 +112,24 @@ export class AssetsService implements OnModuleInit {
       throw new BadGatewayException('IMAGE_TOO_LARGE');
     }
 
-    const contentType = res.headers.get('content-type') ?? 'application/octet-stream';
+    const contentType =
+      res.headers.get('content-type') ?? 'application/octet-stream';
     const body = await readCapped(res, MAX_IMAGE_BYTES);
     return { contentType, body };
   }
 
   async search(dto: SearchAssetsDto): Promise<Paginated<Asset>> {
     const { q, page = 1, limit = 20 } = dto;
-    const filter = q ? { $text: { $search: q } } : {};
+    const filter = q ? buildSearchFilter(q) : {};
     const col = this.repo.collection();
+    const sort: Sort = q ? { score: { $meta: 'textScore' }, id: 1 } : { id: 1 };
+    const options = q
+      ? { projection: { score: { $meta: 'textScore' } } }
+      : undefined;
     const [rows, total] = await Promise.all([
       col
-        .find(filter)
-        .sort({ id: 1 })
+        .find(filter, options)
+        .sort(sort)
         .skip((page - 1) * limit)
         .limit(limit)
         .toArray(),
@@ -128,8 +145,26 @@ export class AssetsService implements OnModuleInit {
   }
 }
 
-function stripMongoId(row: Asset & { _id?: unknown }): Asset {
-  const { _id, ...asset } = row;
+/**
+ * Full words go to `$text` (stemmed, relevance-scored); the trailing token the
+ * user is still typing also matches by prefix, so "sun" finds "Golden Sunset".
+ * Both clauses are index-backed — Mongo rejects `$text` inside `$or` otherwise.
+ */
+function buildSearchFilter(q: string): Filter<AssetDoc> {
+  const prefix = trailingToken(q);
+  const text: Filter<AssetDoc> = { $text: { $search: q } };
+  if (!prefix) return text;
+  return {
+    $or: [text, { searchTokens: { $regex: `^${escapeRegex(prefix)}` } }],
+  };
+}
+
+function stripMongoId(
+  row: AssetDoc & { _id?: unknown; score?: number },
+): Asset {
+  const { _id, score, searchTokens: _tokens, ...asset } = row;
   void _id;
+  void score;
+  void _tokens;
   return asset;
 }

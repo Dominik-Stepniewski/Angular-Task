@@ -13,55 +13,7 @@ const DEBOUNCE_MS = 300;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule],
-  template: `
-    <div class="command-bar">
-      <label class="visually-hidden" for="command-input">Search images</label>
-      <input
-        id="command-input"
-        class="command-input"
-        type="text"
-        autocomplete="off"
-        role="combobox"
-        aria-autocomplete="list"
-        aria-controls="command-suggestions"
-        [attr.aria-expanded]="showSuggestions()"
-        [attr.aria-activedescendant]="activeId()"
-        placeholder="Search the operations index…"
-        [formControl]="control"
-        (input)="onInput()"
-        (focus)="dismissed.set(false)"
-        (blur)="close()"
-        (keydown.escape)="close()"
-        (keydown.arrowDown)="move(1, $event)"
-        (keydown.arrowUp)="move(-1, $event)"
-        (keydown.enter)="onEnter($event)"
-      />
-      <span class="dot" [class.active]="loading()" aria-hidden="true"></span>
-      @if (showSuggestions()) {
-        <ul
-          id="command-suggestions"
-          class="suggestions"
-          role="listbox"
-          aria-label="Query suggestions"
-        >
-          @for (s of suggestions(); track s; let i = $index) {
-            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- ARIA combobox pattern: options are deliberately non-focusable; keyboard (Arrow/Enter) is handled on the input via aria-activedescendant, click is the mouse affordance only. -->
-            <li
-              [id]="'suggestion-' + i"
-              class="chip"
-              role="option"
-              [class.active]="i === activeIndex()"
-              [attr.aria-selected]="i === activeIndex()"
-              (mousedown)="$event.preventDefault()"
-              (click)="pick(s)"
-            >
-              {{ s }}
-            </li>
-          }
-        </ul>
-      }
-    </div>
-  `,
+  templateUrl: './command-bar.component.html',
   styleUrl: './command-bar.component.scss',
 })
 export class CommandBarComponent {

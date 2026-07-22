@@ -34,6 +34,8 @@ describe('AssetsService', () => {
       expect(ops[0]).toEqual({
         updateOne: { filter: { id: 'ov-1' }, update: { $set: expect.any(Object) }, upsert: true },
       });
+      // searchTokens is derived on write — without it the prefix index is empty.
+      expect(ops[0].updateOne.update.$set.searchTokens).toEqual(['t1', 'tag1']);
     });
 
     it('does not call bulkWrite when every row is invalid', async () => {
@@ -67,20 +69,60 @@ describe('AssetsService', () => {
       };
     };
 
-    it('builds a $text filter when q is set, applies skip/limit, strips _id from rows', async () => {
-      const col = makeCol([{ _id: 'x', id: 'ov-1', title: 't1', url: 'u', tags: ['cat'] }], 45);
+    const expectedFilter = (q: string, prefix: string) => ({
+      $or: [{ $text: { $search: q } }, { searchTokens: { $regex: `^${prefix}` } }],
+    });
+
+    it('ORs $text with a prefix match on the trailing token, applies skip/limit, strips internal fields', async () => {
+      const col = makeCol(
+        [{ _id: 'x', score: 1.5, searchTokens: ['cat'], id: 'ov-1', title: 't1', url: 'u', tags: ['cat'] }],
+        45,
+      );
       const svc = new AssetsService({ collection: () => col } as unknown as AssetsRepository);
 
       const res = await svc.search({ q: 'cat', page: 2, limit: 20 });
 
-      expect(col.find).toHaveBeenCalledWith({ $text: { $search: 'cat' } });
-      expect(col.cursor.sort).toHaveBeenCalledWith({ id: 1 });
+      expect(col.find).toHaveBeenCalledWith(expectedFilter('cat', 'cat'), { projection: { score: { $meta: 'textScore' } } });
       expect(col.cursor.skip).toHaveBeenCalledWith(20);
       expect(col.cursor.limit).toHaveBeenCalledWith(20);
-      expect(col.countDocuments).toHaveBeenCalledWith({ $text: { $search: 'cat' } });
+      expect(col.countDocuments).toHaveBeenCalledWith(expectedFilter('cat', 'cat'));
       expect(res).toMatchObject({ page: 2, limit: 20, total: 45, hasNext: true });
       expect(res.data[0]).not.toHaveProperty('_id');
+      expect(res.data[0]).not.toHaveProperty('score');
+      expect(res.data[0]).not.toHaveProperty('searchTokens');
       expect(res.data[0].id).toBe('ov-1');
+    });
+
+    it('sorts by textScore relevance when q is set, and by id otherwise', async () => {
+      const withQ = makeCol([], 0);
+      await new AssetsService({ collection: () => withQ } as unknown as AssetsRepository).search({ q: 'cat' });
+      expect(withQ.cursor.sort).toHaveBeenCalledWith({ score: { $meta: 'textScore' }, id: 1 });
+
+      const noQ = makeCol([], 0);
+      await new AssetsService({ collection: () => noQ } as unknown as AssetsRepository).search({});
+      expect(noQ.cursor.sort).toHaveBeenCalledWith({ id: 1 });
+    });
+
+    it('prefix-matches only the trailing token of a multi-word query', async () => {
+      const col = makeCol([], 0);
+      const svc = new AssetsService({ collection: () => col } as unknown as AssetsRepository);
+      await svc.search({ q: 'golden sun' });
+      expect(col.find).toHaveBeenCalledWith(expectedFilter('golden sun', 'sun'), { projection: { score: { $meta: 'textScore' } } });
+    });
+
+    it('escapes regex metacharacters in the query so input cannot alter the pattern', async () => {
+      const col = makeCol([], 0);
+      const svc = new AssetsService({ collection: () => col } as unknown as AssetsRepository);
+      await svc.search({ q: 'a.*b' });
+      const filter = col.find.mock.calls[0][0];
+      expect(filter.$or[1].searchTokens.$regex).toBe('^b');
+    });
+
+    it('falls back to a bare $text filter when the query has no word characters', async () => {
+      const col = makeCol([], 0);
+      const svc = new AssetsService({ collection: () => col } as unknown as AssetsRepository);
+      await svc.search({ q: '!!!' });
+      expect(col.find).toHaveBeenCalledWith({ $text: { $search: '!!!' } }, { projection: { score: { $meta: 'textScore' } } });
     });
 
     it('uses estimatedDocumentCount and empty filter when q is absent; hasNext false on last page', async () => {
@@ -89,7 +131,7 @@ describe('AssetsService', () => {
 
       const res = await svc.search({ page: 1, limit: 20 });
 
-      expect(col.find).toHaveBeenCalledWith({});
+      expect(col.find).toHaveBeenCalledWith({}, undefined);
       expect(col.estimatedDocumentCount).toHaveBeenCalled();
       expect(col.countDocuments).not.toHaveBeenCalled();
       expect(res.hasNext).toBe(false);

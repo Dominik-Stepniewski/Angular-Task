@@ -37,44 +37,7 @@ const SCROLL_AUDIT_MS = 100;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ScrollingModule],
-  template: `
-    @if (results().length > 0) {
-      <div class="feed">
-        <div class="count" aria-live="polite">{{ results().length }} images</div>
-        <cdk-virtual-scroll-viewport #viewport [itemSize]="rowHeightPx()" class="viewport">
-          <div
-            class="grid-row"
-            *cdkVirtualFor="let row of rows(); trackBy: trackByRow"
-            [style.height.px]="rowHeightPx()"
-          >
-            @for (asset of row; track asset.id) {
-              <button type="button" class="tile" (click)="open(asset)">
-                <img class="tile-img" [src]="asset.thumbnail" [alt]="asset.title" loading="lazy" />
-                <span class="tile-scrim" aria-hidden="true"></span>
-                <span class="tile-source">{{ asset.source }}</span>
-                <span class="tile-cta" aria-hidden="true">Draw ▸</span>
-                <span class="tile-title">{{ asset.title }}</span>
-                @if (counts()[asset.id]; as c) {
-                  <span class="badge" aria-label="{{ c }} annotated region(s)">◈ {{ c }}</span>
-                }
-              </button>
-            }
-          </div>
-        </cdk-virtual-scroll-viewport>
-      </div>
-    } @else if (query().length > 0) {
-      <p class="empty">No images match “{{ query() }}”.</p>
-    } @else if (loading()) {
-      <div class="skeleton" aria-hidden="true">
-        @for (n of skeletons; track n) {
-          <div class="skeleton-tile"></div>
-        }
-      </div>
-      <p class="empty visually-hidden">Loading the index…</p>
-    } @else {
-      <p class="empty">No assets indexed yet — ingest some in Ops.</p>
-    }
-  `,
+  templateUrl: './result-feed.component.html',
   styleUrl: './result-feed.component.scss',
 })
 export class ResultFeedComponent {
