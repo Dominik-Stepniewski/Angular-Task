@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LogsModule } from '../logs/logs.module';
-import { EventsController } from './events.controller';
+import { EventsController } from './presentation/controllers/events.controller';
 import { EventsService } from './events.service';
 
 @Module({

@@ -31,7 +31,7 @@ describe('LogsService', () => {
       2,
       2,
     );
-    expect(res).toMatchObject({ page: 2, limit: 2, total: 5, hasNext: true });
+    expect(res).toMatchObject({ page: 2, limit: 2, total: 5 });
   });
 
   it('normalizes offset ISO bounds to UTC before comparing/querying', async () => {
@@ -60,10 +60,11 @@ describe('LogsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('hasNext is false on the last page', async () => {
+  it('returns entity rows with pagination metadata', async () => {
     const { svc } = makeSvc([{ id: '1' }], 20);
     const res = await svc.findByFilter({ page: 1, limit: 20 });
-    expect(res.hasNext).toBe(false);
+    expect(res.total).toBe(20);
+    expect(res.rows).toHaveLength(1);
   });
 
   it('ensures the compound index on init', async () => {

@@ -21,6 +21,7 @@ data/dataset.json
 
 # OS / editor
 .DS_Store
+._*
 *.log
 
 .angular

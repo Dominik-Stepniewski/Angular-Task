@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EventLog } from '@lumana/contracts';
+import { EventLog } from '../events/domain/interfaces/event-log.model';
 import { Collection, Filter } from 'mongodb';
 import { MongoService } from '@lumana/mongo';
 
@@ -12,7 +12,11 @@ export class LogsRepository {
   }
 
   async insert(log: EventLog): Promise<void> {
-    await this.collection().insertOne(log);
+    await this.collection().updateOne(
+      { id: log.id },
+      { $setOnInsert: log },
+      { upsert: true },
+    );
   }
 
   async findByFilter(
@@ -37,5 +41,6 @@ export class LogsRepository {
 
   async ensureIndexes(): Promise<void> {
     await this.collection().createIndex({ type: 1, timestamp: -1 });
+    await this.collection().createIndex({ id: 1 }, { unique: true });
   }
 }

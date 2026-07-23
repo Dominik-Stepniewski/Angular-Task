@@ -9,13 +9,17 @@ async function bootstrap() {
   const config = loadConfig();
   const app = await NestFactory.create(AppModule);
 
+  app.enableShutdownHooks();
   app.enableCors({ origin: config.corsOrigin });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.NATS,
-    options: { servers: [config.natsUrl] },
-  });
+  app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.NATS,
+      options: { servers: [config.natsUrl] },
+    },
+    { inheritAppConfig: true },
+  );
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Service B — consumer / logs / report')
@@ -35,4 +39,7 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  Logger.error(`Service B failed to start: ${String(err)}`);
+  process.exit(1);
+});

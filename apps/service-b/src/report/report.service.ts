@@ -11,11 +11,15 @@ import {
   buildKpis,
 } from './report-metrics';
 import { renderLine } from './chart.util';
-import { ReportRangeDto } from './dto/report-range.dto';
-
 const INK = '#111111';
 const MUTED = '#555555';
 const HOUR_MS = 3_600_000;
+
+export interface ReportRangeParams {
+  from: string;
+  to: string;
+  bucketMs?: number;
+}
 
 @Injectable()
 export class ReportService {
@@ -24,13 +28,13 @@ export class ReportService {
     private readonly metrics: MetricsService,
   ) {}
 
-  async buildPdf(dto: ReportRangeDto): Promise<Buffer> {
-    const from = Date.parse(dto.from);
-    const to = Date.parse(dto.to);
+  async buildPdf(params: ReportRangeParams): Promise<Buffer> {
+    const from = Date.parse(params.from);
+    const to = Date.parse(params.to);
     if (Number.isNaN(from) || Number.isNaN(to)) {
       throw new BadRequestException('INVALID_RANGE');
     }
-    const bucketMs = dto.bucketMs ?? HOUR_MS;
+    const bucketMs = params.bucketMs ?? HOUR_MS;
 
     const rows = await this.logs.findAnnotateInRange(
       new Date(from).toISOString(),
@@ -38,7 +42,7 @@ export class ReportService {
     );
     const { byLabel } = buildChartData(rows);
 
-    const metrics = await this.metrics.getMetrics({ from: dto.from, to: dto.to, bucketMs });
+    const metrics = await this.metrics.getMetrics({ from: params.from, to: params.to, bucketMs });
     const activity = buildActivityTable(metrics.series);
     const kpis = buildKpis(metrics.byType, activity, byLabel);
 

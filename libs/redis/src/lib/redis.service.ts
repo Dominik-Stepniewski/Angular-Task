@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import {
   createClient,
   RedisClientType,
@@ -8,11 +8,21 @@ import {
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
+  private readonly logger = new Logger(RedisService.name);
   private client!: RedisClientType;
+  private readonly createdKeys = new Set<string>();
 
   async connect(url: string): Promise<void> {
     if (this.client) return;
-    this.client = createClient({ url });
+    this.client = createClient({
+      url,
+      socket: {
+        reconnectStrategy: (retries: number) => Math.min(retries * 100, 3000),
+      },
+    });
+    this.client.on('error', (err) =>
+      this.logger.error(`redis client error: ${String(err)}`),
+    );
     await this.client.connect();
   }
 
@@ -23,21 +33,40 @@ export class RedisService implements OnModuleDestroy {
     return this.client;
   }
 
+  async ping(): Promise<boolean> {
+    try {
+      return (await this.ensureClient().ping()) === 'PONG';
+    } catch {
+      return false;
+    }
+  }
+
+  private async ensureSeries(
+    key: string,
+    labels: Record<string, string>,
+  ): Promise<void> {
+    if (this.createdKeys.has(key)) return;
+    try {
+      await this.ensureClient().ts.create(key, {
+        LABELS: labels,
+        DUPLICATE_POLICY: TIME_SERIES_DUPLICATE_POLICIES.SUM,
+      });
+    } catch (e) {
+      if (!(e instanceof Error && /already exists/i.test(e.message))) throw e;
+    }
+    this.createdKeys.add(key);
+  }
+
   async tsAdd(
     key: string,
     value = 1,
     labels: Record<string, string> = {},
   ): Promise<void> {
-    const client = this.ensureClient();
-    try {
-      await client.ts.add(key, '*', value, {
-        LABELS: labels,
-        ON_DUPLICATE: TIME_SERIES_DUPLICATE_POLICIES.SUM,
-      });
-    } catch {
-      await client.ts.create(key, { LABELS: labels });
-      await client.ts.add(key, '*', value);
-    }
+    await this.ensureSeries(key, labels);
+    await this.ensureClient().ts.add(key, '*', value, {
+      LABELS: labels,
+      ON_DUPLICATE: TIME_SERIES_DUPLICATE_POLICIES.SUM,
+    });
   }
 
   async tsRange(

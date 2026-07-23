@@ -5,12 +5,11 @@ import { MongoModule } from '@lumana/mongo';
 import { RedisModule } from '@lumana/redis';
 import { loadConfig } from '../config';
 import { AnnotationsModule } from '../annotations/annotations.module';
+import { HealthModule } from '../health/health.module';
 import { AssetsModule } from '../assets/assets.module';
 import { IngestModule } from '../ingest/ingest.module';
-import {
-  NATS_CLIENT,
-  TimeSeriesInterceptor,
-} from '../metrics/time-series.interceptor';
+import { NATS_CLIENT } from '../shared/nats/nats.constants';
+import { TimeSeriesInterceptor } from '../shared/interceptors/time-series.interceptor';
 
 const config = loadConfig();
 
@@ -28,6 +27,7 @@ const config = loadConfig();
     IngestModule,
     AssetsModule,
     AnnotationsModule,
+    HealthModule,
   ],
   providers: [{ provide: APP_INTERCEPTOR, useClass: TimeSeriesInterceptor }],
 })

@@ -8,6 +8,7 @@ async function bootstrap() {
   const config = loadConfig();
   const app = await NestFactory.create(AppModule);
 
+  app.enableShutdownHooks();
   app.enableCors({ origin: config.corsOrigin });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
@@ -30,4 +31,7 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  Logger.error(`Service A failed to start: ${String(err)}`);
+  process.exit(1);
+});

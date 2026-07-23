@@ -1,8 +1,18 @@
 import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
-import { EventLog, Paginated } from '@lumana/contracts';
+import { ActionType } from '@lumana/contracts';
 import { Filter } from 'mongodb';
 import { LogsRepository } from './logs.repository';
-import { QueryLogsDto } from './dto/query-logs.dto';
+import { EventLog } from '../events/domain/interfaces/event-log.model';
+import { EventLogEntity } from '../events/domain/entities/event-log.entity';
+import { PaginatedResult } from '../shared/domain/paginated-result';
+
+export interface LogsQuery {
+  from?: string;
+  to?: string;
+  type?: ActionType;
+  page?: number;
+  limit?: number;
+}
 
 @Injectable()
 export class LogsService implements OnModuleInit {
@@ -12,8 +22,8 @@ export class LogsService implements OnModuleInit {
     await this.repo.ensureIndexes();
   }
 
-  async findByFilter(dto: QueryLogsDto): Promise<Paginated<EventLog>> {
-    const { from, to, type, page = 1, limit = 20 } = dto;
+  async findByFilter(query: LogsQuery): Promise<PaginatedResult<EventLogEntity>> {
+    const { from, to, type, page = 1, limit = 20 } = query;
 
     const fromIso = from ? new Date(from).toISOString() : undefined;
     const toIso = to ? new Date(to).toISOString() : undefined;
@@ -31,11 +41,16 @@ export class LogsService implements OnModuleInit {
       filter.timestamp = range;
     }
 
-    const [data, total] = await this.repo.findByFilter(
+    const [docs, total] = await this.repo.findByFilter(
       filter,
       (page - 1) * limit,
       limit,
     );
-    return { data, page, limit, total, hasNext: page * limit < total };
+    return {
+      rows: docs.map(EventLogEntity.fromDocument),
+      page,
+      limit,
+      total,
+    };
   }
 }

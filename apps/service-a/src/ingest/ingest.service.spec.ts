@@ -1,7 +1,21 @@
-const writeFile = jest.fn().mockResolvedValue(undefined);
+const writes: string[] = [];
+const streamMock = {
+  write: jest.fn((chunk: string) => {
+    writes.push(chunk);
+    return true;
+  }),
+  end: jest.fn((chunk: string, cb?: () => void) => {
+    writes.push(chunk);
+    cb?.();
+  }),
+  on: jest.fn(),
+};
+const createWriteStream = jest.fn(() => streamMock);
 const mkdir = jest.fn().mockResolvedValue(undefined);
+jest.mock('node:fs', () => ({
+  createWriteStream: () => createWriteStream(),
+}));
 jest.mock('node:fs/promises', () => ({
-  writeFile: (...args: unknown[]) => writeFile(...args),
   mkdir: (...args: unknown[]) => mkdir(...args),
 }));
 
@@ -12,7 +26,7 @@ import { OpenverseImage } from './map-asset';
 
 describe('IngestService', () => {
   let svc: IngestService;
-  let collect: jest.Mock;
+  let collectPages: jest.Mock;
   let upsertAssets: jest.Mock;
 
   const img = (i: number): OpenverseImage => ({
@@ -25,42 +39,52 @@ describe('IngestService', () => {
     tags: [{ name: `tag${i}` }],
   });
 
+  const pagesOf = (...batches: OpenverseImage[][]) =>
+    (async function* () {
+      for (const b of batches) yield b;
+    })();
+
   beforeEach(() => {
-    writeFile.mockClear();
+    writes.length = 0;
+    streamMock.write.mockClear();
+    streamMock.end.mockClear();
+    createWriteStream.mockClear();
     mkdir.mockClear();
-    collect = jest.fn();
+    collectPages = jest.fn();
     upsertAssets = jest.fn().mockResolvedValue(0);
     svc = new IngestService(
-      { collect } as unknown as OpenverseClient,
+      { collectPages } as unknown as OpenverseClient,
       { upsertAssets } as unknown as AssetsService,
     );
   });
 
-  it('collects via the client, maps images → Asset, writes the file, and upserts into Mongo', async () => {
-    collect.mockResolvedValue({ images: [img(1), img(2)], pages: 1 });
-    upsertAssets.mockResolvedValue(2);
+  it('streams page batches: upserts per batch and appends to the dataset file', async () => {
+    collectPages.mockReturnValue(pagesOf([img(1), img(2)], [img(3)]));
+    upsertAssets.mockResolvedValueOnce(2).mockResolvedValueOnce(1);
 
     const result = await svc.run({ query: 'cat' });
 
-    expect(collect).toHaveBeenCalledWith('cat', 500);
-    expect(result).toMatchObject({ file: 'data/dataset.json', fetched: 2, inserted: 2, pages: 1 });
+    expect(collectPages).toHaveBeenCalledWith('cat', 500);
+    expect(upsertAssets).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ file: 'data/dataset.json', fetched: 3, inserted: 3, pages: 2 });
     expect(mkdir).toHaveBeenCalledWith('data', { recursive: true });
 
-    const written = JSON.parse(writeFile.mock.calls[0][1]);
-    expect(written).toHaveLength(2);
+    const written = JSON.parse(writes.join(''));
+    expect(written).toHaveLength(3);
     expect(written[0]).toMatchObject({
       id: 'ov-1',
       title: 'T1',
       url: 'http://x/1.jpg',
       tags: ['tag1'],
     });
-    expect(upsertAssets).toHaveBeenCalledWith(written);
   });
 
-  it('still upserts (best-effort file) when the dataset file write fails', async () => {
-    collect.mockResolvedValue({ images: [img(1)], pages: 1 });
+  it('still upserts (best-effort file) when the dataset stream cannot be opened', async () => {
+    createWriteStream.mockImplementationOnce(() => {
+      throw new Error('EACCES');
+    });
+    collectPages.mockReturnValue(pagesOf([img(1)]));
     upsertAssets.mockResolvedValue(1);
-    writeFile.mockRejectedValueOnce(new Error('EACCES'));
 
     const result = await svc.run({ query: 'cat' });
 
@@ -69,15 +93,16 @@ describe('IngestService', () => {
   });
 
   it('defaults query + maxRecords when omitted', async () => {
-    collect.mockResolvedValue({ images: [], pages: 0 });
+    collectPages.mockReturnValue(pagesOf());
     const result = await svc.run({});
-    expect(collect).toHaveBeenCalledWith('nature', 500);
+    expect(collectPages).toHaveBeenCalledWith('nature', 500);
     expect(result.fetched).toBe(0);
+    expect(writes.join('')).toBe('[]');
   });
 
   it('passes an explicit maxRecords through to the client', async () => {
-    collect.mockResolvedValue({ images: [img(1)], pages: 1 });
+    collectPages.mockReturnValue(pagesOf([img(1)]));
     await svc.run({ query: 'dog', maxRecords: 25 });
-    expect(collect).toHaveBeenCalledWith('dog', 25);
+    expect(collectPages).toHaveBeenCalledWith('dog', 25);
   });
 });

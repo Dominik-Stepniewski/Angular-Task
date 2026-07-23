@@ -1,4 +1,4 @@
-import { Asset } from '@lumana/contracts';
+import { Asset } from './domain/interfaces/asset.model';
 
 export type ValidateResult =
   | { ok: true; asset: Asset }

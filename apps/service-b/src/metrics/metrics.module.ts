@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MetricsController } from './metrics.controller';
+import { MetricsController } from './presentation/controllers/metrics.controller';
 import { MetricsService } from './metrics.service';
 
 @Module({

@@ -1,30 +1,8 @@
-import { Asset } from '@lumana/contracts';
+import { AssetEntity } from '../assets/domain/entities/asset.entity';
+import { OpenverseImage } from '../assets/domain/interfaces/openverse-image';
 
-export interface OpenverseImage {
-  id: string;
-  title?: string;
-  url: string;
-  thumbnail: string;
-  source: string;
-  license: string;
-  license_version?: string;
-  width?: number;
-  height?: number;
-  tags?: { name: string }[];
-}
+export type { OpenverseImage };
 
-export function mapAsset(img: OpenverseImage): Asset {
-  const tags = [...new Set((img.tags ?? []).map((t) => t.name).filter(Boolean))];
-  return {
-    id: img.id,
-    title: img.title ?? '(untitled)',
-    url: img.url,
-    thumbnail: img.thumbnail,
-    source: img.source,
-    license: img.license,
-    tags,
-    width: img.width,
-    height: img.height,
-    ingestedAt: new Date().toISOString(),
-  };
+export function mapAsset(img: OpenverseImage): AssetEntity {
+  return AssetEntity.fromOpenverse(img);
 }

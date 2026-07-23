@@ -1,4 +1,4 @@
-import { EventLog } from '@lumana/contracts';
+import { EventLog } from '../events/domain/interfaces/event-log.model';
 
 export interface LineDataset {
   label: string;

@@ -14,6 +14,15 @@ export class MongoService implements OnModuleDestroy {
     return this.db;
   }
 
+  async ping(): Promise<boolean> {
+    try {
+      await this.db.command({ ping: 1 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   getCollection<T extends Document = Document>(name: string): Collection<T> {
     if (!this.db) {
       throw new Error('MongoService: call connect() before getCollection()');

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { LogsModule } from '../logs/logs.module';
 import { MetricsModule } from '../metrics/metrics.module';
-import { ReportController } from './report.controller';
+import { ReportController } from './presentation/controllers/report.controller';
 import { ReportService } from './report.service';
 
 @Module({

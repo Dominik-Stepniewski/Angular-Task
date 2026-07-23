@@ -1,8 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { Annotation } from '@lumana/contracts';
 import { AnnotationsRepository } from './annotations.repository';
-import { AnnotationItemDto } from './dto/replace-annotations.dto';
-import { UpsertAnnotationDto } from './dto/upsert-annotation.dto';
+import { AnnotationEntity } from './domain/entities/annotation.entity';
+import { AnnotationProps } from './domain/interfaces/annotation.props';
 
 @Injectable()
 export class AnnotationsService implements OnModuleInit {
@@ -12,40 +11,26 @@ export class AnnotationsService implements OnModuleInit {
     await this.repo.ensureIndexes();
   }
 
-  async upsert(dto: UpsertAnnotationDto): Promise<Annotation> {
-    const now = new Date().toISOString();
-    const annotation: Annotation = {
-      id: dto.id,
-      assetId: dto.assetId,
-      label: dto.label,
-      points: dto.points,
-      rotationRad: dto.rotationRad,
-      createdAt: dto.createdAt ?? now,
-      updatedAt: now,
-    };
-    return this.repo.upsert(annotation);
+  async upsert(props: AnnotationProps): Promise<AnnotationEntity> {
+    const entity = AnnotationEntity.create(props);
+    const saved = await this.repo.upsert(entity.toDocument());
+    return AnnotationEntity.fromDocument(saved);
   }
 
   async replaceForAsset(
     assetId: string,
-    items: AnnotationItemDto[],
-  ): Promise<{ assetId: string; annotations: Annotation[] }> {
-    const now = new Date().toISOString();
-    const annotations: Annotation[] = items.map((i) => ({
-      id: i.id,
+    items: Omit<AnnotationProps, 'assetId'>[],
+  ): Promise<AnnotationEntity[]> {
+    const entities = items.map((i) => AnnotationEntity.create({ ...i, assetId }));
+    await this.repo.replaceForAsset(
       assetId,
-      groupId: i.groupId,
-      label: i.label,
-      points: i.points,
-      rotationRad: i.rotationRad,
-      createdAt: now,
-      updatedAt: now,
-    }));
-    await this.repo.replaceForAsset(assetId, annotations);
-    return { assetId, annotations };
+      entities.map((e) => e.toDocument()),
+    );
+    return entities;
   }
 
-  list(assetId: string): Promise<Annotation[]> {
-    return this.repo.findByAsset(assetId);
+  async list(assetId: string): Promise<AnnotationEntity[]> {
+    const docs = await this.repo.findByAsset(assetId);
+    return docs.map(AnnotationEntity.fromDocument);
   }
 }

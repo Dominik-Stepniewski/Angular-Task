@@ -15,10 +15,19 @@ export class AssetsRepository {
     return this.collection().findOne({ id });
   }
 
-  async bulkWrite(
-    ops: AnyBulkWriteOperation<AssetDoc>[],
-  ): Promise<BulkWriteResult> {
-    return this.collection().bulkWrite(ops, { ordered: false });
+  async upsertMany(docs: AssetDoc[]): Promise<number> {
+    if (docs.length === 0) return 0;
+    const ops: AnyBulkWriteOperation<AssetDoc>[] = docs.map((doc) => ({
+      updateOne: {
+        filter: { id: doc.id },
+        update: { $set: doc },
+        upsert: true,
+      },
+    }));
+    const res: BulkWriteResult = await this.collection().bulkWrite(ops, {
+      ordered: false,
+    });
+    return res.upsertedCount + res.modifiedCount;
   }
 
   async ensureIndexes(): Promise<void> {

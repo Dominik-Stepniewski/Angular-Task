@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { AnnotationsController } from './annotations.controller';
+import { AnnotationsController } from './presentation/controllers/annotations.controller';
 import { AnnotationsRepository } from './annotations.repository';
 import { AnnotationsService } from './annotations.service';
-import { AssetAnnotationsController } from './asset-annotations.controller';
+import { AssetAnnotationsController } from './presentation/controllers/asset-annotations.controller';
 
 @Module({
   controllers: [AnnotationsController, AssetAnnotationsController],

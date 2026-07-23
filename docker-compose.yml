@@ -23,9 +23,17 @@ services:
       retries: 5
 
   nats:
-    image: nats:2
+    image: nats:2-alpine
+    command: ['-m', '8222']
     ports:
       - '4222:4222'
+      - '8222:8222'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8222/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   service-a:
     build:
@@ -41,23 +49,25 @@ services:
       MONGO_DB: lumana
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
+      CORS_ORIGIN: http://localhost:4200
     healthcheck:
       test:
         - CMD
         - node
         - '-e'
-        - "require('http').get('http://localhost:3000/docs',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
+        - "require('http').get('http://localhost:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
+    restart: unless-stopped
     depends_on:
       mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
       nats:
-        condition: service_started
+        condition: service_healthy
 
   service-b:
     build:
@@ -71,23 +81,25 @@ services:
       MONGO_DB: logs
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
+      CORS_ORIGIN: http://localhost:4200
     healthcheck:
       test:
         - CMD
         - node
         - '-e'
-        - "require('http').get('http://localhost:3000/docs',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
+        - "require('http').get('http://localhost:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
+    restart: unless-stopped
     depends_on:
       mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
       nats:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   mongo-data: {}

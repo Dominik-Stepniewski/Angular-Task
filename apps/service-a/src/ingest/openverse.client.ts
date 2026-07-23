@@ -14,21 +14,21 @@ interface OpenversePage {
 
 @Injectable()
 export class OpenverseClient {
-  async collect(query: string, max: number): Promise<{ images: OpenverseImage[]; pages: number }> {
-    const images: OpenverseImage[] = [];
+  async *collectPages(query: string, max: number): AsyncGenerator<OpenverseImage[]> {
+    let fetched = 0;
     let page = 1;
     let pageCount = Infinity;
 
-    while (images.length < max && page <= pageCount) {
+    while (fetched < max && page <= pageCount) {
       const json = await this.fetchPage(query, page);
       const results = json.results ?? [];
       if (results.length === 0) break;
-      images.push(...results);
+      const batch = results.slice(0, max - fetched);
+      fetched += batch.length;
       pageCount = json.page_count ?? pageCount;
       page++;
+      yield batch;
     }
-
-    return { images: images.slice(0, max), pages: page - 1 };
   }
 
   private async fetchPage(query: string, page: number): Promise<OpenversePage> {

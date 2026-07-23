@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Annotation } from '@lumana/contracts';
+import { Annotation } from './domain/interfaces/annotation.model';
 import { MongoService } from '@lumana/mongo';
-import { Collection } from 'mongodb';
+import { AnyBulkWriteOperation, Collection } from 'mongodb';
 
 @Injectable()
 export class AnnotationsRepository {
@@ -22,9 +22,14 @@ export class AnnotationsRepository {
   }
 
   async replaceForAsset(assetId: string, docs: Annotation[]): Promise<void> {
-    const col = this.collection();
-    await col.deleteMany({ assetId });
-    if (docs.length) await col.insertMany(docs, { ordered: false });
+    const keepIds = docs.map((d) => d.id);
+    const ops: AnyBulkWriteOperation<Annotation>[] = [
+      { deleteMany: { filter: { assetId, id: { $nin: keepIds } } } },
+      ...docs.map((d) => ({
+        replaceOne: { filter: { id: d.id }, replacement: d, upsert: true },
+      })),
+    ];
+    await this.collection().bulkWrite(ops, { ordered: true });
   }
 
   findByAsset(assetId: string): Promise<Annotation[]> {

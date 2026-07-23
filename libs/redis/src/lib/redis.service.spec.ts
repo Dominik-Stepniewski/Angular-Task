@@ -9,7 +9,7 @@ import { RedisService } from './redis.service';
 describe('RedisService', () => {
   const createClientMock = createClient as unknown as jest.Mock;
   let ts: { add: jest.Mock; create: jest.Mock; range: jest.Mock };
-  let client: { connect: jest.Mock; quit: jest.Mock; ts: typeof ts };
+  let client: { connect: jest.Mock; quit: jest.Mock; on: jest.Mock; ping: jest.Mock; ts: typeof ts };
 
   beforeEach(() => {
     ts = {
@@ -20,6 +20,8 @@ describe('RedisService', () => {
     client = {
       connect: jest.fn().mockResolvedValue(undefined),
       quit: jest.fn().mockResolvedValue(undefined),
+      on: jest.fn(),
+      ping: jest.fn().mockResolvedValue('PONG'),
       ts,
     };
     createClientMock.mockReset().mockReturnValue(client);
@@ -28,7 +30,9 @@ describe('RedisService', () => {
   it('connects with the given url', async () => {
     const svc = new RedisService();
     await svc.connect('redis://localhost:6379');
-    expect(createClientMock).toHaveBeenCalledWith({ url: 'redis://localhost:6379' });
+    expect(createClientMock).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'redis://localhost:6379' }),
+    );
     expect(client.connect).toHaveBeenCalledTimes(1);
   });
 
@@ -44,13 +48,22 @@ describe('RedisService', () => {
     );
   });
 
-  it('tsAdd creates the series then retries when the first add rejects', async () => {
-    ts.add.mockRejectedValueOnce(new Error('TSDB: the key does not exist'));
+  it('tsAdd creates the series idempotently before the first add', async () => {
     const svc = new RedisService();
     await svc.connect('redis://x');
     await svc.tsAdd('k', 1, { a: 'b' });
+    await svc.tsAdd('k', 1, { a: 'b' });
+    expect(ts.create).toHaveBeenCalledTimes(1);
     expect(ts.create).toHaveBeenCalledWith('k', expect.objectContaining({ LABELS: { a: 'b' } }));
     expect(ts.add).toHaveBeenCalledTimes(2);
+  });
+
+  it('tsAdd tolerates a concurrent create of the same series', async () => {
+    ts.create.mockRejectedValueOnce(new Error('ERR TSDB: key already exists'));
+    const svc = new RedisService();
+    await svc.connect('redis://x');
+    await svc.tsAdd('k', 1, { a: 'b' });
+    expect(ts.add).toHaveBeenCalledTimes(1);
   });
 
   it('tsRange maps to client.ts.range with COUNT aggregation and bucket', async () => {

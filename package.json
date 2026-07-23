@@ -58,11 +58,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "nx",
-      "@nx/nest",
-      "@swc/core",
-      "esbuild",
-      "nx-cloud"
+      "canvas"
     ]
   },
   "dependencies": {

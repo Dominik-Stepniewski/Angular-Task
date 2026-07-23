@@ -1,20 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
-import { ActionEvent, EventLog } from '@lumana/contracts';
+import { ActionEvent } from '@lumana/contracts';
 import { LogsRepository } from '../logs/logs.repository';
+import { EventLogEntity } from './domain/entities/event-log.entity';
 
 @Injectable()
 export class EventsService {
   constructor(private readonly repo: LogsRepository) {}
 
-  async record(e: ActionEvent): Promise<void> {
-    const log: EventLog = {
-      id: randomUUID(),
-      sourceAction: e.sourceAction,
-      type: e.type,
-      payload: e.payload,
-      timestamp: e.timestamp,
-    };
-    await this.repo.insert(log);
+  async record(event: ActionEvent): Promise<void> {
+    const entity = EventLogEntity.fromActionEvent(event);
+    await this.repo.insert(entity.toDocument());
   }
 }

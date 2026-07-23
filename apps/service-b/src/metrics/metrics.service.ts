@@ -1,10 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { ActionType } from '@lumana/contracts';
+import { ACTION_TYPES, ActionType, MetricSample, metricsKey } from '@lumana/contracts';
 import { RedisService } from '@lumana/redis';
-import { MetricsRangeDto } from './dto/metrics-range.dto';
 
-const ACTIONS: ActionType[] = ['ingest', 'upload', 'search', 'annotate'];
 const HOUR_MS = 3600000;
+
+export interface MetricsRangeParams {
+  from: string;
+  to: string;
+  bucketMs?: number;
+}
 
 export interface MetricPoint {
   t: number;
@@ -25,20 +29,20 @@ export interface MetricsResult {
 export class MetricsService {
   constructor(private readonly redis: RedisService) {}
 
-  async getMetrics(dto: MetricsRangeDto): Promise<MetricsResult> {
-    const from = Date.parse(dto.from);
-    const to = Date.parse(dto.to);
+  async getMetrics(params: MetricsRangeParams): Promise<MetricsResult> {
+    const from = Date.parse(params.from);
+    const to = Date.parse(params.to);
     if (Number.isNaN(from) || Number.isNaN(to)) {
       throw new BadRequestException('INVALID_RANGE');
     }
-    const bucketMs = dto.bucketMs ?? HOUR_MS;
+    const bucketMs = params.bucketMs ?? HOUR_MS;
 
     const ranges = (await Promise.all(
-      ACTIONS.map((a) => this.redis.tsRange(`svcA:action:${a}`, from, to, bucketMs)),
-    )) as unknown as { timestamp: number; value: number }[][];
+      ACTION_TYPES.map((a) => this.redis.tsRange(metricsKey(a), from, to, bucketMs)),
+    )) as unknown as MetricSample[][];
 
     const byType = {} as Record<ActionType, number>;
-    const series: MetricSeries[] = ACTIONS.map((action, i) => {
+    const series: MetricSeries[] = ACTION_TYPES.map((action, i) => {
       const points = (ranges[i] ?? []).map((p) => ({ t: p.timestamp, v: p.value }));
       byType[action] = points.reduce((sum, p) => sum + p.v, 0);
       return { action, points };

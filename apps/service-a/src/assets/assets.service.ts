@@ -5,19 +5,14 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { Asset, Paginated } from '@lumana/contracts';
-import { AnyBulkWriteOperation, Filter, Sort } from 'mongodb';
+import { Filter, Sort } from 'mongodb';
 import { AssetsRepository } from './assets.repository';
-import { SearchAssetsDto } from './dto/search-assets.dto';
-import { UploadResultDto } from './dto/upload-result.dto';
+import { Asset } from './domain/interfaces/asset.model';
+import { AssetEntity } from './domain/entities/asset.entity';
 import { validateAsset } from './validate-asset';
 import { isSafeHttpUrl } from './url-safety';
-import {
-  AssetDoc,
-  escapeRegex,
-  searchTokens,
-  trailingToken,
-} from './search-tokens';
+import { AssetDoc, escapeRegex, trailingToken } from './search-tokens';
+import { PaginatedResult } from '../shared/domain/paginated-result';
 
 const IMAGE_TIMEOUT_MS = 15000;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -25,6 +20,18 @@ const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 export interface ProxiedImage {
   contentType: string;
   body: Buffer;
+}
+
+export interface IngestFileResult {
+  inserted: number;
+  failedCount: number;
+  failed: { index: number; reason: string }[];
+}
+
+export interface AssetSearchQuery {
+  q?: string;
+  page?: number;
+  limit?: number;
 }
 
 async function readCapped(res: Response, max: number): Promise<Buffer> {
@@ -57,7 +64,7 @@ export class AssetsService implements OnModuleInit {
     await this.repo.ensureIndexes();
   }
 
-  async ingestFile(buf: Buffer): Promise<UploadResultDto> {
+  async ingestFile(buf: Buffer): Promise<IngestFileResult> {
     let rows: unknown[];
     try {
       const parsed = JSON.parse(buf.toString());
@@ -68,10 +75,10 @@ export class AssetsService implements OnModuleInit {
     }
 
     const failed: { index: number; reason: string }[] = [];
-    const valid: Asset[] = [];
+    const valid: AssetEntity[] = [];
     rows.forEach((r, i) => {
       const v = validateAsset(r);
-      if (v.ok) valid.push(v.asset);
+      if (v.ok) valid.push(AssetEntity.fromDocument(v.asset));
       else failed.push({ index: i, reason: v.reason });
     });
 
@@ -79,17 +86,8 @@ export class AssetsService implements OnModuleInit {
     return { inserted, failedCount: failed.length, failed };
   }
 
-  async upsertAssets(assets: Asset[]): Promise<number> {
-    if (assets.length === 0) return 0;
-    const ops: AnyBulkWriteOperation<AssetDoc>[] = assets.map((a) => ({
-      updateOne: {
-        filter: { id: a.id },
-        update: { $set: { ...a, searchTokens: searchTokens(a) } },
-        upsert: true,
-      },
-    }));
-    const res = await this.repo.bulkWrite(ops);
-    return res.upsertedCount + res.modifiedCount;
+  upsertAssets(assets: AssetEntity[]): Promise<number> {
+    return this.repo.upsertMany(assets.map((e) => e.toDocument()));
   }
 
   async getImage(id: string): Promise<ProxiedImage> {
@@ -118,8 +116,8 @@ export class AssetsService implements OnModuleInit {
     return { contentType, body };
   }
 
-  async search(dto: SearchAssetsDto): Promise<Paginated<Asset>> {
-    const { q, page = 1, limit = 20 } = dto;
+  async search(query: AssetSearchQuery): Promise<PaginatedResult<AssetEntity>> {
+    const { q, page = 1, limit = 20 } = query;
     const filter = q ? buildSearchFilter(q) : {};
     const col = this.repo.collection();
     const sort: Sort = q ? { score: { $meta: 'textScore' }, id: 1 } : { id: 1 };
@@ -136,20 +134,14 @@ export class AssetsService implements OnModuleInit {
       q ? col.countDocuments(filter) : col.estimatedDocumentCount(),
     ]);
     return {
-      data: rows.map((r) => stripMongoId(r)),
+      rows: rows.map((r) => AssetEntity.fromDocument(stripMongoId(r))),
       page,
       limit,
       total,
-      hasNext: page * limit < total,
     };
   }
 }
 
-/**
- * Full words go to `$text` (stemmed, relevance-scored); the trailing token the
- * user is still typing also matches by prefix, so "sun" finds "Golden Sunset".
- * Both clauses are index-backed — Mongo rejects `$text` inside `$or` otherwise.
- */
 function buildSearchFilter(q: string): Filter<AssetDoc> {
   const prefix = trailingToken(q);
   const text: Filter<AssetDoc> = { $text: { $search: q } };

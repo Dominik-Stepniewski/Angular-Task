@@ -1,15 +1,3 @@
-/**
- * One-off backfill: derive `searchTokens` for assets stored before the field
- * existed. Without it those documents never match the prefix clause in
- * AssetsService.search(), so typeahead silently misses them.
- *
- * Reuses searchTokens() rather than reimplementing tokenisation in an
- * aggregation pipeline, so backfilled docs are byte-identical to newly
- * ingested ones. Idempotent: re-running only rewrites the same values.
- *
- * Run: npx tsx apps/service-a/src/assets/backfill-search-tokens.ts
- * Env: MONGO_URI (default mongodb://127.0.0.1:27017), MONGO_DB (default lumana)
- */
 import { AnyBulkWriteOperation, MongoClient } from 'mongodb';
 import { AssetDoc, searchTokens } from './search-tokens';
 
@@ -50,8 +38,6 @@ export async function backfillSearchTokens(
     }
     await flush();
 
-    // The index is normally created by AssetsService.onModuleInit; ensure it
-    // here too so a standalone backfill leaves the collection queryable.
     await col.createIndex({ searchTokens: 1 });
 
     return { scanned, updated };

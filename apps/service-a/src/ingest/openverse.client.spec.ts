@@ -7,6 +7,16 @@ const img = (i: number) => ({ id: `ov-${i}`, url: `u${i}`, thumbnail: `t${i}`, s
 describe('OpenverseClient', () => {
   let client: OpenverseClient;
 
+  const collect = async (query: string, max: number) => {
+    const images = [];
+    let pages = 0;
+    for await (const batch of client.collectPages(query, max)) {
+      images.push(...batch);
+      pages++;
+    }
+    return { images, pages };
+  };
+
   beforeEach(() => {
     client = new OpenverseClient();
     jest.spyOn(client as unknown as { backoff: () => Promise<void> }, 'backoff').mockResolvedValue();
@@ -16,7 +26,7 @@ describe('OpenverseClient', () => {
     const fetchMock = jest.fn().mockResolvedValue(okResponse({ page_count: 1, results: [img(1)] }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await client.collect('cat', 10);
+    await collect('cat', 10);
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain('page_size=20');
@@ -30,7 +40,7 @@ describe('OpenverseClient', () => {
       .mockResolvedValueOnce(okResponse({ page_count: 2, results: [img(3), img(4)] }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const { images, pages } = await client.collect('cat', 100);
+    const { images, pages } = await collect('cat', 100);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(images.map((i) => i.id)).toEqual(['ov-1', 'ov-2', 'ov-3', 'ov-4']);
@@ -43,7 +53,7 @@ describe('OpenverseClient', () => {
       .mockResolvedValueOnce(okResponse({ page_count: 99, results: [img(1)] }))
       .mockResolvedValueOnce(okResponse({ page_count: 99, results: [] })) as unknown as typeof fetch;
 
-    const { images } = await client.collect('cat', 100);
+    const { images } = await collect('cat', 100);
     expect(images).toHaveLength(1);
   });
 
@@ -52,7 +62,7 @@ describe('OpenverseClient', () => {
       .fn()
       .mockResolvedValue(okResponse({ page_count: 1000, results: Array.from({ length: 50 }, (_, i) => img(i)) })) as unknown as typeof fetch;
 
-    const { images } = await client.collect('cat', 30);
+    const { images } = await collect('cat', 30);
     expect(images).toHaveLength(30);
   });
 
@@ -63,19 +73,19 @@ describe('OpenverseClient', () => {
       .mockResolvedValueOnce(okResponse({ page_count: 1, results: [img(1)] }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const { images } = await client.collect('cat', 10);
+    const { images } = await collect('cat', 10);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(images).toHaveLength(1);
   });
 
   it('throws BadGateway after exhausting retries on 5xx', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 }) as unknown as typeof fetch;
-    await expect(client.collect('cat', 10)).rejects.toBeInstanceOf(BadGatewayException);
+    await expect(collect('cat', 10)).rejects.toBeInstanceOf(BadGatewayException);
     expect((global.fetch as jest.Mock).mock.calls).toHaveLength(3);
   });
 
   it('throws BadGateway when the fetch rejects (timeout)', async () => {
     global.fetch = jest.fn().mockRejectedValue(new DOMException('timeout', 'TimeoutError')) as unknown as typeof fetch;
-    await expect(client.collect('cat', 10)).rejects.toBeInstanceOf(BadGatewayException);
+    await expect(collect('cat', 10)).rejects.toBeInstanceOf(BadGatewayException);
   });
 });
